@@ -93,7 +93,17 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-5)
 num_epochs = 5
 log = Report(num_epochs)
 
-
+for epoch in range(num_epochs):
+    N = len(trn_dl)
+    for ix, (data, _) in enumerate(trn_dl):
+        loss = train_batch(data, model, criterion, optimizer)
+        log.record(pos=(epoch + (ix+1)/N), trn_loss=loss, end="\r")
+    N = len(val_dl)
+    for ix, (data, _) in enumerate(val_dl):
+        loss = validate_batch(data, model, criterion)
+        log.record(pos=(epoch + (ix+1)/N), val_loss=loss, end="\r")
+    log.report_avgs(epoch+1)
+    log.plot_epochs(log=True)
 
 
 # %%
