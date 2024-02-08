@@ -105,5 +105,132 @@ for epoch in range(num_epochs):
     log.report_avgs(epoch+1)
     log.plot_epochs(log=True)
 
+#%% visualize the model on val_ds
+for _ in range(3):
+    ix = np.random.randint(len(val_ds))
+    im, _ = val_ds[ix]
+    _im = model(im[None])[0]
+    fig, ax = plt.subplots(1, 2, figsize=(3,3))
+    show(im[0], ax=ax[0], title="input")
+    show(_im[0], ax=ax[1], title="prediction")
+    plt.tight_layout()
+    plt.show()
 
+# %%  experiment with varying size of nodes in latent_dim
+def train_aec(latent_dim):
+    model = AutoEncoder(3).to(device)
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-5)
+    
+    num_epochs = 5
+    log = Report(num_epochs)
+
+    for epoch in range(num_epochs):
+        N = len(trn_dl)
+        for ix, (data, _) in enumerate(trn_dl):
+            loss = train_batch(data, model, criterion, optimizer)
+            log.record(pos=(epoch + (ix+1)/N), trn_loss=loss, end="\r")
+        N = len(val_dl)
+        for ix, (data, _) in enumerate(val_dl):
+            loss = validate_batch(data, model, criterion)
+            log.record(pos=(epoch + (ix+1)/N), val_loss=loss, end="\r")
+        log.report_avgs(epoch+1)
+        log.plot_epochs(log=True)
+    return model
+0246723811
+#%%    
+aecs = [train_aec(dim) for dim in [50, 2, 3, 5, 10]]
+    
+#%% visualize the model on val_ds
+for _ in range(10):
+    ix = np.random.randint(len(val_ds))
+    im, _ = val_ds[ix]
+    fig, ax = plt.subplots(1, len(aecs)+1, figsize=(10,4))
+    ax = iter(ax.flat)
+    show(im[0], ax=next(ax), title="input") 
+    for model in aecs:
+        _im = model(im[None])[0] 
+        show(_im[0], ax=next(ax), title=f"prediction\nlatent-dim:{model.latent_dim}")
+        plt.tight_layout()
+        plt.show()
+    
+# %%  ####### autoencoders with convolutional layer  #####
+class ConvAutoEncoder(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Conv2d(1, 32, 3, stride=3, padding=1),
+            nn.ReLU(True),
+            nn.MaxPool2d(2, stride=2),
+            nn.Conv2d(32, 64, 3, stride=2, padding=1),
+            nn.ReLU(True),
+            nn.MaxPool2d(2, stride=1)
+        )
+        
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose2d(64, 32, 3, stride=2),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(32, 16, 5, stride=3, padding=1),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(16, 1, 2, stride=2, padding=1),
+            nn.Tanh()
+        )
+        
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+        
+#%%
+model = ConvAutoEncoder().to(device)
+summary(model, (1,28,28))
+
+#%%
+# %%  train conv for encoder / decoder
+def train_convaec(model, criterion, optimizer, trn_dl, val_dl, num_epochs):
+    #model = AutoEncoder(3).to(device)
+    #criterion = nn.MSELoss()
+    #optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-5)
+    
+    #num_epochs = 5
+    log = Report(num_epochs)
+
+    for epoch in range(num_epochs):
+        N = len(trn_dl)
+        for ix, (data, _) in enumerate(trn_dl):
+            loss = train_batch(data, model, criterion, optimizer)
+            log.record(pos=(epoch + (ix+1)/N), trn_loss=loss, end="\r")
+        N = len(val_dl)
+        for ix, (data, _) in enumerate(val_dl):
+            loss = validate_batch(data, model, criterion)
+            log.record(pos=(epoch + (ix+1)/N), val_loss=loss, end="\r")
+        log.report_avgs(epoch+1)
+    log.plot_epochs(log=True)
+    return model
+# %%
+model = ConvAutoEncoder().to(device)
+criterion = nn.MSELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+
+
+# %%
+model = train_convaec(model=model, criterion=criterion, optimizer=optimizer,
+              trn_dl=trn_dl, val_dl=val_dl, num_epochs=10
+              )
+#%% visualize the model on val_ds
+def viz_pred(model, val_ds):
+    for _ in range(3):
+        ix = np.random.randint(len(val_ds))
+        im, _ = val_ds[ix]
+        _im = model(im[None])[0]
+        fig, ax = plt.subplots(1, 2, figsize=(3,3))
+        show(im[0], ax=ax[0], title="input")
+        show(_im[0], ax=ax[1], title="prediction")
+        plt.tight_layout()
+        plt.show()
+        
+#%%
+viz_pred(model=model, val_ds=val_ds)
+
+        
 # %%
