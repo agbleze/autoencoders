@@ -233,4 +233,54 @@ def viz_pred(model, val_ds):
 viz_pred(model=model, val_ds=val_ds)
 
         
+# %% visualizaing clusters of similar images using autoencoders  ##
+latent_vectors = []
+classes = []
+
+#%%
+for im, clss in val_dl:
+    latent_vectors.append((model.encoder(im).view(len(im), -1)))
+    classes.extend(clss)
+latent_vectors = torch.cat(latent_vectors).cpu().detach().numpy()
+
+#%%
+from sklearn.manifold import TSNE
+tsne = TSNE(2)
+
+#%%
+clustered = tsne.fit_transform(latent_vectors)
+
+#%%
+fig = plt.figure(figsize=(12, 10))
+cmap = plt.get_cmap("Spectral", 10)
+plt.scatter(*zip(*clustered), c=classes, cmap=cmap)
+plt.colorbar(drawedges=True)
+
+
+
+
+# %%   #### understanding the limitation of embeddings that fall between clsuters
+## instead of belonging to one.
+latent_vectors = []
+classes = []
+for im, clss in val_dl:
+    latent_vectors.append(model.encoder(im))
+    classes.extend(clss)
+latent_vectors = torch.cat(latent_vectors).cpu().detach().numpy().reshape(10000, -1)
+
+## generate random vectors with mean stadard deviation of and 1 with noise applied 
+rand_vectors = []
+for col in latent_vectors.transpose(1,0):
+    mu, sigma = col.mean(), col.std()
+    rand_vectors.append(sigma*torch.randn(1, 100) + mu)
+
+rand_vectors = torch.cat(rand_vectors).transpose(1,0).to(device)
+fig, ax = plt.subplots(10, 10, figsize=(7,7))
+ax = iter(ax.flat)
+for p in rand_vectors:
+    img = model.decoder(p.reshape(1,64,2,2)).view(28, 28)
+    show(img, ax=next(ax))
+
+
+
 # %%
