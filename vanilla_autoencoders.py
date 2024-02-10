@@ -317,3 +317,79 @@ class VAE(nn.Module):
         z = self.sampling(mean, log_var)
         return self.decoder(z), mean, log_var
     
+    
+def train_batch(data, model, optimizer, loss_function):
+    model.train()
+    data = data.to(device)
+    optimizer.zero_grad()
+    recon_batch, mean, log_var = model(data) 
+    loss, mse, kld = loss_function(recon_batch, data, mean, log_var)
+    loss.backward()
+    optimizer.step()
+    return loss, mse, kld, log_var.mean(), mean.mean()
+
+
+@torch.no_grad()
+def validate_batch(data, model, loss_function):
+    model.eval()
+    data = data.to(device)
+    recon, mean, log_var = model(data)
+    loss, mse, kld = loss_function(recon, data, mean, log_var)
+    return loss, mse, kld, log_var.mean(), mean.mean()
+
+
+
+def loss_function(recon_x, x, mean, log_var):
+    RECON = F.mse_loss(recon_x, x.view(-1, 784), reduction="sum")
+    KLD = -0.5 * torch.sum(1 + log_var - mean.pow(2) - log_var.exp())
+    return RECON + KLD, RECON, KLD
+    
+
+#%% define model and optimizer
+vae = VAE(x_dim=784, h_dim1=512, h_dim2=256, z_dim=50).to(device)
+optimizer = optim.AdamW(vae.parameters(), lr=1e-3)
+
+#%% train the model
+n_epochs = 50
+log = Report(n_epochs)
+
+for epoch in range(n_epochs):
+    N = len(trn_dl)
+    for batch_idx, (data, _) in enumerate(trn_dl):
+        loss, recon, kld, log_var, mean = train_batch(data, vae, optimizer, loss_function)
+        pos = epoch + (1 + batch_idx) /N
+        log.record(pos, train_loss=loss, train_kld=kld, train_recon=recon,
+                   end="\r"
+                   )
+    N = len(val_dl)
+    for batch_idx, (data, _) in enumerate(val_dl):
+        loss, recon, kld, log_var, mean = validate_batch(data, vae, loss_function)
+        pos = epoch + (1+batch_idx)/N
+        log.record(pos, val_loss=loss, val_kld=kld, val_recon=recon, val_log_var=log_var,
+                    val_mean=mean, end="\r"
+                    )
+    log.report_avgs(epoch+1)
+    with torch.no_grad():
+        z = torch.randn(64, 50).to(device)
+        sample = vae.decoder(z).to(device)
+        images = make_grid(sample.view(64, 1, 28, 28)).permute(1, 2, 0)
+        show(images)
+        
+#%%
+log.plot_epochs(["train_loss", "val_loss"])
+        
+        
+        
+        
+        
+#%%
+
+bes = {"a": 1, "b": 2}
+
+#%%
+
+bes.get("c", "none")
+
+           
+
+# %%
