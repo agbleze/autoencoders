@@ -200,5 +200,3 @@ for ex in range(n_epochs):
 log.plot_epochs()
         
     
-
-# %%
